@@ -6,9 +6,6 @@ global_tf_datatype = tf.float32
 global_np_datatype = np.float32
 
 rk_methods = ['Backward_Euler', 'Forward_Euler', 'Midpoint', 'Gauss1', 'Trapezoid', 'Gauss2', 'Gauss3']
-multistep_methods = ['AB1', 'AB2', 'AB3', 'AB4', 'AB5', \
-                     'AM1', 'AM2', 'AM3', 'AM4', \
-                     'BDF1', 'BDF2', 'BDF3', 'BDF4', 'BDF5', 'BDF6']
 
 def RK_loss(X,f,h,A,b,m):
     """
@@ -70,22 +67,6 @@ def RK_residuals(X,f,h,A,b,bs,m):
 
     # Return residual
     return [Residual_high, Residual_low, High_low_diff]
-
-def Multistep_loss(X,f,h,a,b,n,m):
-
-    s = len(b)
-
-    fX = f(X)
-
-    loss = tf.reduce_sum(tf.nn.l2_loss(tf.slice(X, [0,s-1], [n, m-s+1]) - \
-                                       tf.add_n([a[i]*tf.slice(X, [0,i], [n, m-s+1]) for i in range(s-1)]) - \
-                                       h*tf.add_n([b[i]*tf.slice(fX, [0,i], [n, m-s+1]) for i in range(s)])))
-
-    loss = loss + tf.reduce_sum(tf.nn.l2_loss(tf.slice(X, [0,0], [n, m-s+1]) - \
-                                       tf.add_n([a[i]*tf.slice(X, [0,s-1-i], [n, m-s+1]) for i in range(s-1)]) - \
-                                       -h*tf.add_n([b[i]*tf.slice(fX, [0,s-1-i], [n, m-s+1]) for i in range(s)])))
-
-    return loss
 
 def RK_tables(method = 'Midpoint'):
     """
@@ -149,64 +130,6 @@ def RK_tables(method = 'Midpoint'):
         c = [0,1]
 
     return A,b,bs,c
-
-def Multistep_tables(method = 'BDF3'):
-    """
-    Family of linear multistep methods
-    """
-
-    # Explicit Adams-Bashforth methods
-    if method == 'AB1':
-        a = []
-        b = []
-    elif method == 'AB2':
-        a = []
-        b = []
-    elif method == 'AB3':
-        a = []
-        b = []
-    elif method == 'AB4':
-        a = []
-        b = []
-    elif method == 'AB5':
-        a = []
-        b = []
-
-    # Implicit Adams-Moulton methods
-    elif method == 'AM1':
-        a = [1]
-        b = [1/2,1/2]
-    elif method == 'AM2':
-        a = [0,1]
-        b = []
-    elif method == 'AM3':
-        a = [0,0,1]
-        b = []
-    elif method == 'AM4':
-        a = [0,0,0,1]
-        b = [-19/720,106/720,-264/720,646/720,251/720]
-
-    # Implicit Backwards differentiation formula methods
-    elif method == 'BDF1':
-        a = [1]
-        b = [0,1]
-    elif method == 'BDF2':
-        a = [-1/3,4/3]
-        b = [0,0,2/3]
-    elif method == 'BDF3':
-        a = [2/11,-9/11,18/11]
-        b = [0,0,0,6/11]
-    elif method == 'BDF4':
-        a = [-3/25,16/25,-36/25,48/25]
-        b = [0,0,0,0,12/25]
-    elif method == 'BDF5':
-        a = [12/137,-75/137,200/137,-300/137,300/137]
-        b = [0,0,0,0,0,60/137]
-    elif method == 'BDF6':
-        a = [-10/147,72/147,-225/147,400/147,-450/147,360/147]
-        b = [0,0,0,0,0,0,60/147]
-
-    return a,b
 
 def approximate_noise(Y, T, lam = 1e-3):
 
@@ -281,20 +204,6 @@ def create_computational_graph(Y, T, f, method = 'Midpoint', gamma = 1e-8, noise
         # Cost from fit to implicit timestepper
         timestepper_cost = RK_loss(X_extended, f, H, A, b, m)
         residual_cost = RK_residuals(X_extended,f,H,A,b,bs,m)[0]
-
-    elif method in multistep_methods:
-
-        # Use Linear multistep method.  Assumes constant timesteps.
-
-        a,b = Multistep_tables(method)
-        h = tf.constant(T[1]-T[0], dtype=global_tf_datatype, shape=[1,1], name = "h")
-
-        # State variable
-        X_hat = tf.get_variable("X_hat", initializer = Ys.astype(global_np_datatype))
-
-        # Cost from fit to implicit timestepper
-        timestepper_cost = Multistep_loss(X_hat, f, h, a, b, n, m)
-        residual_cost = timestepper_cost
 
     else: raise ValueError('Method not recognized.')
 
@@ -430,20 +339,6 @@ def create_computational_graph_2(Y, T, f, f_np, method = 'Midpoint', gamma = 1e-
         # Cost from fit to implicit timestepper
         timestepper_cost = RK_loss_2(X_extended, f, H, A, b, m)
         residual_cost = RK_residuals_2(X_extended,f,H,A,b,bs,m)[0]
-
-    elif method in multistep_methods:
-
-        # Use Linear multistep method.  Assumes constant timesteps.
-
-        a,b = Multistep_tables(method)
-        h = tf.constant(T[1]-T[0], dtype=global_tf_datatype, shape=[1,1], name = "h")
-
-        # State variable
-        X_hat = tf.get_variable("X_hat", initializer = Ys.astype(global_np_datatype))
-
-        # Cost from fit to implicit timestepper
-        timestepper_cost = Multistep_loss(X_hat, f, h, a, b, n, m)
-        residual_cost = timestepper_cost
 
     else: raise ValueError('Method not recognized.')
 
